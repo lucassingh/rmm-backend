@@ -13,11 +13,11 @@ RUN apt-get update && \
 RUN pip install --no-cache-dir --upgrade pip setuptools wheel
 
 # Copiar e instalar dependencias
-COPY backend/requirements.txt .
+COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copiar aplicación
-COPY backend .
+COPY . .
 
 # Usar usuario no-root para mayor seguridad
 RUN useradd -m myuser && chown -R myuser:myuser /app
