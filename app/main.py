@@ -14,7 +14,7 @@ app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "https://rmm-frontend.vercel.app"],
+    allow_origins=[os.getenv("LOCAL_URL"), os.getenv("PRODUCTION_URL")],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
