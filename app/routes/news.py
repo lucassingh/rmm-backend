@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Security, Form, Request
+from fastapi import status, Query
 from sqlalchemy.orm import Session
 from app.models.news import News as NewsModel
 from app.models.user import User
@@ -17,12 +18,11 @@ from app.models.user import User as UserModel
 from app.models.news import News
 import httpx
 
-# Configuración de logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
 router = APIRouter()
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")
+MAX_LIMIT = 100
 
 async def require_admin(
     current_user: User = Security(get_current_active_user, scopes=["admin"])
@@ -55,6 +55,24 @@ def get_supabase_client(token: str = None) -> Client:
             )
     
     return client
+
+@router.get("/news/public/", response_model=List[NewsResponse])
+def read_public_news(
+    skip: int = 0,
+    limit: int = Query(default=10, le=MAX_LIMIT),
+    db: Session = Depends(get_db)
+):
+    """
+    Endpoint público para obtener todas las noticias (sin autenticación)
+    """
+    try:
+        return db.query(NewsModel).order_by(NewsModel.date.desc()).offset(skip).limit(limit).all()
+    except Exception as e:
+        logger.error(f"Error obteniendo noticias públicas: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail="Error al recuperar las noticias públicas"
+        )
 
 @router.post("/news/", response_model=NewsResponse)
 async def create_news(
@@ -326,30 +344,29 @@ async def update_news(
             detail="Error interno al actualizar la noticia"
         )
 
-@router.get("/news/", response_model=List[NewsResponse])
-def read_news(
-    skip: int = 0,
-    limit: int = 10,
-    db: Session = Depends(get_db)
-):
-    try:
-        return db.query(NewsModel).offset(skip).limit(limit).all()
-    except Exception as e:
-        logger.error(f"Error obteniendo noticias: {str(e)}")
-        raise HTTPException(
-            status_code=500,
-            detail="Error al recuperar las noticias"
-        )
-
 @router.get("/news/{news_id}", response_model=NewsResponse)
 def read_single_news(
     news_id: int,
+    current_user: UserModel = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
+    """
+    Obtener una noticia específica por ID
+    - Admin puede ver cualquier noticia
+    - Usuarios normales solo pueden ver sus propias noticias
+    """
     try:
         news = db.query(NewsModel).filter(NewsModel.id == news_id).first()
         if not news:
             raise HTTPException(status_code=404, detail="Noticia no encontrada")
+        
+        # Verificar permisos
+        if current_user.role != "admin" and news.user_id != current_user.id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="No tienes permiso para ver esta noticia"
+            )
+            
         return news
     except HTTPException as he:
         raise he
@@ -360,34 +377,58 @@ def read_single_news(
             detail="Error al recuperar la noticia"
         )
 
+@router.get("/news/", response_model=List[NewsResponse])
+def read_news(
+    skip: int = 0,
+    limit: int = 10,
+    current_user: UserModel = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    try:
+        # Si es admin, puede ver todas las noticias
+        if current_user.role == "admin":
+            return db.query(NewsModel).offset(skip).limit(limit).all()
+        # Si es usuario normal, solo ve sus propias noticias
+        else:
+            return db.query(NewsModel).filter(
+                NewsModel.user_id == current_user.id
+            ).offset(skip).limit(limit).all()
+    except Exception as e:
+        logger.error(f"Error obteniendo noticias: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail="Error al recuperar las noticias"
+        )
+
 @router.delete("/news/{news_id}")
 def delete_news(
     news_id: int,
-    current_user: User = Depends(require_admin),
+    current_user: UserModel = Depends(get_current_active_user),
     token: str = Depends(oauth2_scheme),
     db: Session = Depends(get_db)
 ):
     try:
-        # Obtener la noticia
         db_news = db.query(NewsModel).filter(NewsModel.id == news_id).first()
         if not db_news:
             raise HTTPException(status_code=404, detail="Noticia no encontrada")
         
-        # Configurar Supabase
         supabase = get_supabase_client(token)
         bucket_name = os.getenv("SUPABASE_BUCKET", "newsimages")
         
-        # Eliminar imagen de Supabase Storage si existe
         if db_news.image_url:
             try:
-                # Extraer path del URL
                 storage_prefix = f"{os.getenv('SUPABASE_URL')}/storage/v1/object/public/{bucket_name}/"
                 if db_news.image_url.startswith(storage_prefix):
                     file_path = db_news.image_url[len(storage_prefix):]
                     supabase.storage.from_(bucket_name).remove([file_path])
+                
+                if current_user.role != "admin" and db_news.user_id != current_user.id:
+                    raise HTTPException(
+                        status_code=403,
+                        detail="No tienes permiso para eliminar esta noticia"
+                    )
             except Exception as storage_error:
                 logger.error(f"Error eliminando imagen: {str(storage_error)}")
-                # Continuar aunque falle la eliminación de la imagen
         
         # Eliminar de la base de datos
         db.delete(db_news)

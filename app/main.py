@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from .routes import news, auth, users  # Cambiado a import relativo
+from .routes import news, auth, users
 from .database import Base, engine
 from fastapi.staticfiles import StaticFiles
 import os
