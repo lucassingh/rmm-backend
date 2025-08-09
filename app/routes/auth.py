@@ -66,8 +66,8 @@ async def login_user(
     form_data: OAuth2PasswordRequestForm = Depends(),
     db: Session = Depends(get_db)
 ):
-    # Buscar usuario en tu base de datos
     user = db.query(UserModel).filter(UserModel.email == form_data.username).first()
+    print(f"Usuario encontrado en DB: {user.email}, Rol: {user.role}")  # Debug
     if not user or not verify_password(form_data.password, user.hashed_password):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -75,11 +75,25 @@ async def login_user(
             headers={"WWW-Authenticate": "Bearer"},
         )
     
-    # Crear token JWT sin depender de Supabase Auth
     access_token = create_access_token(
-        data={"sub": user.email, "scopes": ["user"] if user.role == UserRole.USER else ["admin", "user"]}
+        data={
+            "sub": user.email,
+            "scopes": ["user"] if user.role == UserRole.USER else ["admin", "user"],
+            "role": user.role  # Añade el rol al payload del token
+        }
     )
-    return {"access_token": access_token, "token_type": "bearer"}
+    
+    # Devuelve también la información del usuario
+    return {
+        "access_token": access_token,
+        "token_type": "bearer",
+        "user": {  # Añade esta sección
+            "id": str(user.id),
+            "email": user.email,
+            "role": user.role,
+            "is_active": user.is_active
+        }
+    }
 
 @router.get("/verify")
 async def verify_token_endpoint(

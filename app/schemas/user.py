@@ -17,6 +17,7 @@ class UserCreate(UserBase):
 class User(UserBase):
     id: uuid.UUID
     is_active: bool
+    role: UserRole
     
     class Config:
         from_attributes = True
@@ -33,6 +34,17 @@ class UserUpdate(BaseModel):
 class Token(BaseModel):
     access_token: str
     token_type: str
+    user: User
 
 class TokenData(BaseModel):
     email: str | None = None
+
+class UserLoginResponse(BaseModel):
+    id: uuid.UUID
+    role: UserRole
+    
+    class Config:
+        from_attributes = True
+        json_encoders = {
+            uuid.UUID: lambda v: str(v)
+        }
