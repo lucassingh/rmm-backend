@@ -62,10 +62,8 @@ def read_public_news(
     limit: int = Query(default=10, le=MAX_LIMIT),
     db: Session = Depends(get_db)
 ):
-    """
-    Endpoint público para obtener todas las noticias (sin autenticación)
-    """
     try:
+        # Incluir noticias con o sin usuario
         return db.query(NewsModel).order_by(NewsModel.date.desc()).offset(skip).limit(limit).all()
     except Exception as e:
         logger.error(f"Error obteniendo noticias públicas: {str(e)}")
@@ -350,18 +348,13 @@ def read_single_news(
     current_user: UserModel = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
-    """
-    Obtener una noticia específica por ID
-    - Admin puede ver cualquier noticia
-    - Usuarios normales solo pueden ver sus propias noticias
-    """
     try:
         news = db.query(NewsModel).filter(NewsModel.id == news_id).first()
         if not news:
             raise HTTPException(status_code=404, detail="Noticia no encontrada")
         
-        # Verificar permisos
-        if current_user.role != "admin" and news.user_id != current_user.id:
+        # Verificar permisos (admin puede ver todo, usuario solo sus noticias o noticias sin dueño)
+        if current_user.role != "admin" and news.user_id not in [None, current_user.id]:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="No tienes permiso para ver esta noticia"
@@ -385,11 +378,11 @@ def read_news(
     db: Session = Depends(get_db)
 ):
     try:
-        # Si es admin, puede ver todas las noticias
         if current_user.role == "admin":
+            # Admin ve todas las noticias, incluyendo las sin usuario
             return db.query(NewsModel).offset(skip).limit(limit).all()
-        # Si es usuario normal, solo ve sus propias noticias
         else:
+            # Usuario normal solo ve sus propias noticias
             return db.query(NewsModel).filter(
                 NewsModel.user_id == current_user.id
             ).offset(skip).limit(limit).all()
@@ -412,6 +405,13 @@ def delete_news(
         if not db_news:
             raise HTTPException(status_code=404, detail="Noticia no encontrada")
         
+        # Verificar permisos
+        if current_user.role != "admin" and db_news.user_id != current_user.id:
+            raise HTTPException(
+                status_code=403,
+                detail="No tienes permiso para eliminar esta noticia"
+            )
+        
         supabase = get_supabase_client(token)
         bucket_name = os.getenv("SUPABASE_BUCKET", "newsimages")
         
@@ -421,14 +421,9 @@ def delete_news(
                 if db_news.image_url.startswith(storage_prefix):
                     file_path = db_news.image_url[len(storage_prefix):]
                     supabase.storage.from_(bucket_name).remove([file_path])
-                
-                if current_user.role != "admin" and db_news.user_id != current_user.id:
-                    raise HTTPException(
-                        status_code=403,
-                        detail="No tienes permiso para eliminar esta noticia"
-                    )
             except Exception as storage_error:
                 logger.error(f"Error eliminando imagen: {str(storage_error)}")
+                # No fallar si no se puede eliminar la imagen
         
         # Eliminar de la base de datos
         db.delete(db_news)

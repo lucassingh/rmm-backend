@@ -9,6 +9,8 @@ class UserRole(str, Enum):
 
 class UserBase(BaseModel):
     email: EmailStr
+    first_name: str = Field(..., min_length=1, max_length=50)
+    last_name: str = Field(..., min_length=1, max_length=50)
 
 class UserCreate(UserBase):
     password: str

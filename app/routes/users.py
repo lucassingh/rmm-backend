@@ -1,5 +1,6 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Security
+from fastapi import APIRouter, Depends, HTTPException, status, Security, Response
 from sqlalchemy.orm import Session
+import uuid
 from app.database import get_db
 from app.models.user import User as UserModel, UserRole
 from app.schemas.user import User, UserCreate, UserUpdate
@@ -21,6 +22,8 @@ async def create_user(
     hashed_password = get_password_hash(user_data.password)
     db_user = UserModel(
         email=user_data.email,
+        first_name=user_data.first_name,
+        last_name=user_data.last_name,
         hashed_password=hashed_password,
         role=user_data.role
     )
@@ -85,6 +88,10 @@ async def update_user(
     
     if user_data.email is not None:
         db_user.email = user_data.email
+    if user_data.first_name is not None:  # Nuevo campo
+        db_user.first_name = user_data.first_name
+    if user_data.last_name is not None:   # Nuevo campo
+        db_user.last_name = user_data.last_name
     if user_data.password is not None:
         db_user.hashed_password = get_password_hash(user_data.password)
     if user_data.role is not None:
@@ -97,22 +104,34 @@ async def update_user(
     return db_user
 
 # Eliminar usuario (solo admin)
+from app.models.news import News  # Asegúrate de importar tu modelo News
+
 @router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_user(
-    user_id: int,
+    user_id: str,
     db: Session = Depends(get_db),
     current_user: UserModel = Security(get_current_active_user, scopes=["admin"])
 ):
-    db_user = db.query(UserModel).filter(UserModel.id == user_id).first()
-    if db_user is None:
+    try:
+        user_uuid = uuid.UUID(user_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid user ID format")
+
+    db_user = db.query(UserModel).filter(UserModel.id == user_uuid).first()
+    if not db_user:
         raise HTTPException(status_code=404, detail="User not found")
     
-    if current_user.id == user_id:
+    if str(current_user.id) == user_id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Admins cannot delete themselves"
         )
     
+    # Actualizar las noticias para desasociarlas del usuario
+    db.query(News).filter(News.user_id == user_uuid).update({News.user_id: None})
+    
+    # Eliminar el usuario
     db.delete(db_user)
     db.commit()
-    return None
+    
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

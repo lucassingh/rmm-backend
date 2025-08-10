@@ -12,4 +12,4 @@ class News(Base):
     image_description = Column(String(200))
     body = Column(Text)
     date = Column(DateTime)
-    user_id = Column(UUID(as_uuid=True), ForeignKey('users.id'))
+    user_id = Column(UUID(as_uuid=True), ForeignKey('users.id', ondelete="SET NULL"), nullable=True)

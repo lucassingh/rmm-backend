@@ -39,6 +39,8 @@ async def register_user(
         db_user = UserModel(
             email=user_data.email,
             hashed_password=hashed_password,
+            first_name=user_data.first_name,
+            last_name=user_data.last_name,
             role=UserRole.ADMIN.value if is_first_user else user_data.role.value,
             is_active=True
         )
@@ -49,6 +51,8 @@ async def register_user(
         return {
         "id": str(db_user.id),
         "email": db_user.email,
+        "first_name": user_data.first_name,
+        "last_name": user_data.last_name,
         "role": db_user.role,
         "is_active": db_user.is_active
     }
@@ -87,9 +91,11 @@ async def login_user(
     return {
         "access_token": access_token,
         "token_type": "bearer",
-        "user": {  # Añade esta sección
+        "user": {
             "id": str(user.id),
             "email": user.email,
+            "first_name": user.first_name,
+            "last_name": user.last_name,
             "role": user.role,
             "is_active": user.is_active
         }

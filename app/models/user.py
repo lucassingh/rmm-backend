@@ -13,6 +13,8 @@ class User(Base):
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     email = Column(String(100), unique=True, index=True)
+    first_name = Column(String(50), nullable=False)
+    last_name = Column(String(50), nullable=False)
     hashed_password = Column(String(200))
     is_active = Column(Boolean, default=True)
     role = Column(String(10), default="user")
@@ -21,6 +23,8 @@ class User(Base):
         return {
             "id": str(self.id),
             "email": self.email,
+            "first_name": self.first_name,
+            "last_name": self.last_name,
             "role": self.role,
             "is_active": self.is_active
         }
