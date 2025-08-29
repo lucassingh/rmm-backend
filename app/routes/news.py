@@ -17,6 +17,7 @@ from urllib.parse import urljoin
 from app.models.user import User as UserModel
 from app.models.news import News
 import httpx
+from sqlalchemy.orm import joinedload
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -63,8 +64,42 @@ def read_public_news(
     db: Session = Depends(get_db)
 ):
     try:
-        # Incluir noticias con o sin usuario
-        return db.query(NewsModel).order_by(NewsModel.date.desc()).offset(skip).limit(limit).all()
+        # Incluir noticias con información del autor usando joinedload
+        news_list = db.query(NewsModel)\
+            .options(joinedload(NewsModel.user))\
+            .order_by(NewsModel.date.desc())\
+            .offset(skip)\
+            .limit(limit)\
+            .all()
+        
+        # Convertir a la respuesta con información del autor
+        response = []
+        for news_item in news_list:
+            news_dict = {
+                "id": news_item.id,
+                "title": news_item.title,
+                "subtitle": news_item.subtitle,
+                "image_url": news_item.image_url,
+                "image_description": news_item.image_description,
+                "body": news_item.body,
+                "date": news_item.date,
+                "user_id": news_item.user_id,
+                "author": None
+            }
+            
+            # Si hay un usuario asociado, agregar información del autor
+            if news_item.user:
+                news_dict["author"] = {
+                    "id": news_item.user.id,
+                    "first_name": news_item.user.first_name,
+                    "last_name": news_item.user.last_name,
+                    "email": news_item.user.email
+                }
+            
+            response.append(NewsResponse(**news_dict))
+        
+        return response
+        
     except Exception as e:
         logger.error(f"Error obteniendo noticias públicas: {str(e)}")
         raise HTTPException(

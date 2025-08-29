@@ -1,4 +1,5 @@
 from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey
+from sqlalchemy.orm import relationship
 from sqlalchemy.dialects.postgresql import UUID
 from app.database import Base
 
@@ -13,3 +14,6 @@ class News(Base):
     body = Column(Text)
     date = Column(DateTime)
     user_id = Column(UUID(as_uuid=True), ForeignKey('users.id', ondelete="SET NULL"), nullable=True)
+    
+    # Relación con User
+    user = relationship("User", backref="news")

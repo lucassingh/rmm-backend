@@ -14,7 +14,7 @@ app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[os.getenv("LOCAL_URL"), os.getenv("PRODUCTION_URL")],
+    allow_origins=[os.getenv("LOCAL_URL"), os.getenv("PRODUCTION_URL"), os.getenv("LOCAL_LANDING_URL"), os.getenv("PRODUCTION_LANDING_URL")],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

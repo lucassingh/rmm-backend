@@ -3,8 +3,12 @@ from datetime import datetime
 from typing import Optional
 from uuid import UUID
 from fastapi import Form
-from typing import Optional
-import uuid
+
+class AuthorInfo(BaseModel):
+    id: UUID
+    first_name: str
+    last_name: str
+    email: str
 
 class NewsBase(BaseModel):
     title: str
@@ -32,7 +36,7 @@ class NewsResponse(NewsBase):
     id: int
     image_url: Optional[str] = None
     date: datetime
-    user_id: Optional[uuid.UUID] = Field(None)
-    
+    user_id: Optional[UUID] = Field(None)
+    author: Optional[AuthorInfo] = None
     class Config:
         from_attributes = True
