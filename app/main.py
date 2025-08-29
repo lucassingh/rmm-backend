@@ -4,17 +4,30 @@ from .routes import news, auth, users
 from .database import Base, engine
 from fastapi.staticfiles import StaticFiles
 import os
+from dotenv import load_dotenv
 
-# Ruta absoluta para archivos estáticos
+load_dotenv()
+
 static_dir = os.path.join(os.path.dirname(__file__), "..", "static")
 
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
 
+allowed_origins = [
+    os.getenv("LOCAL_URL"),
+    os.getenv("PRODUCTION_URL"), 
+    os.getenv("LOCAL_LANDING_URL"),
+    os.getenv("PRODUCTION_LANDING_URL")
+]
+
+allowed_origins = [origin for origin in allowed_origins if origin is not None]
+
+print(f"Allowed origins: {allowed_origins}")  # Para debug
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[os.getenv("LOCAL_URL"), os.getenv("PRODUCTION_URL"), os.getenv("LOCAL_LANDING_URL"), os.getenv("PRODUCTION_LANDING_URL")],
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
