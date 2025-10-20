@@ -58,21 +58,14 @@ def get_supabase_client(token: str = None) -> Client:
     return client
 
 @router.get("/news/public/", response_model=List[NewsResponse])
-def read_public_news(
-    skip: int = 0,
-    limit: int = Query(default=10, le=MAX_LIMIT),
-    db: Session = Depends(get_db)
-):
+def read_public_news(db: Session = Depends(get_db)):
     try:
-        # Incluir noticias con información del autor usando joinedload
+        # Obtener TODAS las noticias sin paginación
         news_list = db.query(NewsModel)\
             .options(joinedload(NewsModel.user))\
             .order_by(NewsModel.date.desc())\
-            .offset(skip)\
-            .limit(limit)\
             .all()
         
-        # Convertir a la respuesta con información del autor
         response = []
         for news_item in news_list:
             news_dict = {
@@ -87,7 +80,6 @@ def read_public_news(
                 "author": None
             }
             
-            # Si hay un usuario asociado, agregar información del autor
             if news_item.user:
                 news_dict["author"] = {
                     "id": news_item.user.id,
