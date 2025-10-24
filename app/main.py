@@ -14,16 +14,28 @@ Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
 
-allowed_origins = [
+# Orígenes base fijos + variables de entorno
+base_origins = [
+    "https://redmisionesmundiales.org",  # Sin www
+    "http://localhost:5173",
+]
+
+# Variables de entorno
+env_origins = [
     os.getenv("LOCAL_URL"),
     os.getenv("PRODUCTION_URL"), 
     os.getenv("LOCAL_LANDING_URL"),
-    os.getenv("PRODUCTION_LANDING_URL")
+    os.getenv("PRODUCTION_LANDING_URL"),
+    os.getenv("PRODUCTION_REAL_URL"),
 ]
 
-allowed_origins = [origin for origin in allowed_origins if origin is not None]
+# Combinar y limpiar
+allowed_origins = list(set(
+    base_origins + 
+    [origin for origin in env_origins if origin is not None]
+))
 
-print(f"Allowed origins: {allowed_origins}")  # Para debug
+print(f"🌐 Allowed origins: {allowed_origins}")
 
 app.add_middleware(
     CORSMiddleware,
